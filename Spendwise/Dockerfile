@@ -19,5 +19,5 @@ WORKDIR /app
 
 COPY --from=build /app/target/Spendwise-0.0.1-SNAPSHOT.jar Spendwise-v1.0.jar
 
-EXPOSE 9090
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "Spendwise-v1.0.jar"]
