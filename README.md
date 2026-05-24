@@ -86,7 +86,7 @@ docker run -p 8080:8080 \
 Integration tests use an in‑memory H2 DB and mock email service.
 
 ## Deployment
-- **Backend** – Render (or any cloud provider). Example URL: `https://spendwise-backend.onrender.com/api`
+- **Backend** – Render (or any cloud provider). Example URL: `https://spendwise-backend.onrender.com/api/v1.0`
 - **CI/CD** – GitHub Actions can build the Docker image and push to a registry.
 
 
