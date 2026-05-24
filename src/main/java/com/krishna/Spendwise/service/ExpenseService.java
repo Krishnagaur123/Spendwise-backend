@@ -14,6 +14,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Business logic for expense records.
+ * All user-scoped queries resolve the profile from the Spring Security context —
+ * controllers never need to pass a user ID.
+ */
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
@@ -26,20 +31,19 @@ public class ExpenseService {
         ProfileEntity profile = profileService.getCurrentProfile();
         CategoryEntity category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
-        ExpenseEntity newExpense = toEntity(dto, profile, category);
-        newExpense = expenseRepository.save(newExpense);
-        return toDTO(newExpense);
+        return toDTO(expenseRepository.save(toEntity(dto, profile, category)));
     }
 
+    /** Returns expenses for the current calendar month. Default view on the Expense page. */
     public List<ExpenseDto> getCurrentMonthExpensesForCurrentUser() {
         ProfileEntity profile = profileService.getCurrentProfile();
         LocalDate now = LocalDate.now();
-        LocalDate startDate = now.withDayOfMonth(1);
-        LocalDate endDate = now.withDayOfMonth(now.lengthOfMonth());
-        List<ExpenseEntity> list = expenseRepository.findByProfileIdAndDateBetween(profile.getId(), startDate, endDate);
-        return list.stream().map(this::toDTO).toList();
+        return expenseRepository
+                .findByProfileIdAndDateBetween(profile.getId(), now.withDayOfMonth(1), now.withDayOfMonth(now.lengthOfMonth()))
+                .stream().map(this::toDTO).toList();
     }
 
+    /** Enforces ownership — only the expense owner can delete it. */
     public void deleteExpense(Long expenseId) {
         ProfileEntity profile = profileService.getCurrentProfile();
         ExpenseEntity entity = expenseRepository.findById(expenseId)
@@ -50,52 +54,49 @@ public class ExpenseService {
         expenseRepository.delete(entity);
     }
 
+    /** Top 5 by date — used in the dashboard recent transactions widget. */
     public List<ExpenseDto> getLatest5ExpensesForCurrentUser() {
         ProfileEntity profile = profileService.getCurrentProfile();
-        List<ExpenseEntity> list = expenseRepository.findTop5ByProfileIdOrderByDateDesc(profile.getId());
-        return list.stream().map(this::toDTO).toList();
+        return expenseRepository.findTop5ByProfileIdOrderByDateDesc(profile.getId())
+                .stream().map(this::toDTO).toList();
     }
 
+    /** All-time total. Returns ZERO instead of null when no records exist. */
     public BigDecimal getTotalExpenseForCurrentUser() {
         ProfileEntity profile = profileService.getCurrentProfile();
         BigDecimal total = expenseRepository.findTotalExpenseByProfileId(profile.getId());
         return total != null ? total : BigDecimal.ZERO;
     }
 
+    /** Used by the Filter page — supports date range, keyword, and sort direction. */
     public List<ExpenseDto> filterExpenses(LocalDate startDate, LocalDate endDate, String keyword, Sort sort) {
         ProfileEntity profile = profileService.getCurrentProfile();
-        List<ExpenseEntity> list=expenseRepository.findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(profile.getId(), startDate, endDate,keyword,sort);
-        return list.stream().map(this::toDTO).toList();
+        return expenseRepository.findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(
+                profile.getId(), startDate, endDate, keyword, sort)
+                .stream().map(this::toDTO).toList();
     }
 
-    public List<ExpenseDto> getExpenseForUserOnDate(Long ProfileId, LocalDate date) {
-        List<ExpenseEntity>  list = expenseRepository.findByProfileIdAndDate(ProfileId, date);
-        return list.stream().map(this::toDTO).toList();
+    /** Called by {@link NotificationService} to build the nightly expense summary email. */
+    public List<ExpenseDto> getExpenseForUserOnDate(Long profileId, LocalDate date) {
+        return expenseRepository.findByProfileIdAndDate(profileId, date)
+                .stream().map(this::toDTO).toList();
     }
 
-
-    // mapper
     private ExpenseEntity toEntity(ExpenseDto dto, ProfileEntity profile, CategoryEntity category) {
         return ExpenseEntity.builder()
-                .name(dto.getName())
-                .icon(dto.getIcon())
-                .amount(dto.getAmount())
-                .date(dto.getDate())
-                .profile(profile)
-                .category(category)
+                .name(dto.getName()).icon(dto.getIcon())
+                .amount(dto.getAmount()).date(dto.getDate())
+                .profile(profile).category(category)
                 .build();
     }
+
     private ExpenseDto toDTO(ExpenseEntity entity) {
         return ExpenseDto.builder()
-                .id(entity.getId())
-                .name(entity.getName())
-                .icon(entity.getIcon())
+                .id(entity.getId()).name(entity.getName()).icon(entity.getIcon())
                 .categoryId(entity.getCategory() != null ? entity.getCategory().getId() : null)
                 .categoryName(entity.getCategory() != null ? entity.getCategory().getName() : "N/A")
-                .amount(entity.getAmount())
-                .date(entity.getDate())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
+                .amount(entity.getAmount()).date(entity.getDate())
+                .createdAt(entity.getCreatedAt()).updatedAt(entity.getUpdatedAt())
                 .build();
     }
 

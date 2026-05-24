@@ -23,6 +23,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Central Spring Security configuration.
+ *
+ * <p>The app intentionally supports two authentication strategies in parallel:
+ * <ul>
+ *   <li><b>JWT</b> — React frontend stores the token in localStorage and sends it as
+ *       {@code Authorization: Bearer <token>}. Handled by {@link com.krishna.Spendwise.security.JwtRequestFilter}.</li>
+ *   <li><b>Session</b> — Assignment API clients use the {@code JSESSIONID} cookie issued on
+ *       login. {@link HttpSessionSecurityContextRepository} is wired explicitly so session auth
+ *       persists correctly across requests.</li>
+ * </ul>
+ * CSRF is disabled because both auth paths are CSRF-resistant by design.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -31,35 +44,48 @@ public class SecurityConfig {
     private final JwtRequestFilter jwtRequestFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception{
-        // Use HttpSessionSecurityContextRepository so Spring Security can
-        // restore authentication from the JSESSIONID cookie on every request.
-        // Without this, session login works once but subsequent requests lose auth.
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        // Explicit session repository wiring — without this, session auth is lost between requests.
         HttpSessionSecurityContextRepository sessionRepo = new HttpSessionSecurityContextRepository();
 
         httpSecurity.cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .securityContext(ctx -> ctx.securityContextRepository(sessionRepo))
-                .authorizeHttpRequests(auth->auth
-                        .requestMatchers("/status","/health","/register","/activate","/login", "/auth/register", "/auth/login", "/auth/logout").permitAll()
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/status", "/health", "/register", "/activate", "/login",
+                                "/auth/register", "/auth/login", "/auth/logout").permitAll()
                         .anyRequest().authenticated())
-                .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // Return 401 JSON for unauthenticated requests — prevents Spring from issuing a 302 redirect
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(401);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"message\":\"Authentication required\"}");
+                        })
+                )
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         return httpSecurity.build();
     }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * CORS config for cross-origin requests from the React dev server (port 3000 → 8080).
+     * {@code allowedOriginPatterns("*")} is required when {@code allowCredentials(true)} is set —
+     * a literal wildcard origin is rejected by the Fetch spec in that combination.
+     * Restrict to your actual frontend domain in production.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Cookie"));
-        // Expose Set-Cookie so the browser can store the JSESSIONID session cookie
-        // in cross-origin requests (frontend :3000 <-> backend :8080).
+        // Required so the browser can read and store Set-Cookie in cross-origin responses
         configuration.setExposedHeaders(List.of("Set-Cookie"));
         configuration.setAllowCredentials(true);
 
@@ -68,6 +94,7 @@ public class SecurityConfig {
         return source;
     }
 
+    /** {@link AuthenticationManager} backed by our UserDetailsService and BCrypt encoder. */
     @Bean
     public AuthenticationManager authenticationManager() throws Exception {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();

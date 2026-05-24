@@ -13,6 +13,17 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Scheduled email notifications sent to all users daily.
+ *
+ * <ul>
+ *   <li><b>22:00 IST</b> — reminder to log income and expenses for the day.</li>
+ *   <li><b>23:00 IST</b> — HTML table summary of today's recorded expenses (skipped if none).</li>
+ * </ul>
+ *
+ * Both jobs iterate over all profiles. For large user bases, this should be replaced
+ * with a paginated or queue-based approach.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,7 +36,6 @@ public class NotificationService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-
     @Scheduled(cron = "0 0 22 * * *", zone = "IST")
     public void sendDailyIncomeExpenseReminder() {
         log.info("Job started: sendDailyIncomeExpenseReminder()");
@@ -37,8 +47,7 @@ public class NotificationService {
                     + " style='display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px'>Open App</a>"
                     + "<br><br>Best regards,<br>Money Manager Team";
             emailService.sendVerificationEmail(profile.getEmail(),
-                    "Daily reminder: Add your income and expenses",
-                    body);
+                    "Daily reminder: Add your income and expenses", body);
         }
         log.info("Job finished: sendDailyIncomeExpenseReminder()");
     }
@@ -50,43 +59,38 @@ public class NotificationService {
         List<ProfileEntity> profiles = profileRepository.findAll();
         for (ProfileEntity profile : profiles) {
             List<ExpenseDto> todaysExpenses = expenseService.getExpenseForUserOnDate(profile.getId(), LocalDate.now());
-            if (!todaysExpenses.isEmpty()) {
-                StringBuilder table = new StringBuilder();
-                table.append("<table style='border-collapse:collapse;width:100%;'>");
-                table.append("<tr style='background-color:#f2f2f2;'>"
-                        + "<th style='border:1px solid #ddd;padding:8px;text-align:left;'>#</th>"
-                        + "<th style='border:1px solid #ddd;padding:8px;text-align:left;'>Name</th>"
-                        + "<th style='border:1px solid #ddd;padding:8px;text-align:right;'>Amount</th>"
-                        + "<th style='border:1px solid #ddd;padding:8px;text-align:left;'>Category ID</th>"
-                        + "</tr>");
-                int i = 1;
-                for (ExpenseDto expense : todaysExpenses) {
-                    table.append("<tr>");
-                    table.append("<td style='border:1px solid #ddd;padding:8px;'>").append(i++).append("</td>");
-                    table.append("<td style='border:1px solid #ddd;padding:8px;'>").append(escape(expense.getName())).append("</td>");
-                    table.append("<td style='border:1px solid #ddd;padding:8px;text-align:right;'>").append(expense.getAmount()).append("</td>");
-                    table.append("<td style='border:1px solid #ddd;padding:8px;'>").append(expense.getCategoryId()).append("</td>");
-                    table.append("</tr>");
-                }
-                table.append("</table>");
+            if (todaysExpenses.isEmpty()) continue; // no email if nothing was logged
 
-                String subject = "Today's Expense Summary";
-                String body = "<p>Hi " + profile.getFullName() + ",</p>"
-                        + "<p>Here is the summary of today's expenses.</p>"
-                        + table;
-                emailService.sendVerificationEmail(profile.getEmail(), subject, body);
+            StringBuilder table = new StringBuilder();
+            table.append("<table style='border-collapse:collapse;width:100%;'>")
+                 .append("<tr style='background-color:#f2f2f2;'>")
+                 .append("<th style='border:1px solid #ddd;padding:8px;text-align:left;'>#</th>")
+                 .append("<th style='border:1px solid #ddd;padding:8px;text-align:left;'>Name</th>")
+                 .append("<th style='border:1px solid #ddd;padding:8px;text-align:right;'>Amount</th>")
+                 .append("<th style='border:1px solid #ddd;padding:8px;text-align:left;'>Category ID</th>")
+                 .append("</tr>");
+
+            int i = 1;
+            for (ExpenseDto expense : todaysExpenses) {
+                table.append("<tr>")
+                     .append("<td style='border:1px solid #ddd;padding:8px;'>").append(i++).append("</td>")
+                     .append("<td style='border:1px solid #ddd;padding:8px;'>").append(escape(expense.getName())).append("</td>")
+                     .append("<td style='border:1px solid #ddd;padding:8px;text-align:right;'>").append(expense.getAmount()).append("</td>")
+                     .append("<td style='border:1px solid #ddd;padding:8px;'>").append(expense.getCategoryId()).append("</td>")
+                     .append("</tr>");
             }
+            table.append("</table>");
+
+            emailService.sendVerificationEmail(profile.getEmail(), "Today's Expense Summary",
+                    "<p>Hi " + profile.getFullName() + ",</p><p>Here is your expense summary for today.</p>" + table);
         }
     }
 
-    // Utility to escape HTML entities to avoid breaking markup in names
+    /** Escapes HTML special characters to prevent XSS in user-provided expense names inside emails. */
     private static String escape(String s) {
         if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
 }

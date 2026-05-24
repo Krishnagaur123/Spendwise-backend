@@ -1,21 +1,19 @@
 package com.krishna.Spendwise.domain.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * Expense/income category. Categories are either system defaults ({@code isDefault=true},
+ * seeded on user registration) or user-created customs. Defaults cannot be deleted.
+ */
 @Entity
 @Table(name = "tbl_categories")
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
+@Data @AllArgsConstructor @NoArgsConstructor @Builder
 public class CategoryEntity {
 
     @Id
@@ -31,15 +29,16 @@ public class CategoryEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    /** {@code "INCOME"} or {@code "EXPENSE"} — determines which table a transaction is saved to. */
     private String type;
 
     private String icon;
 
-    // true = system default (Salary, Food, Rent etc.) — cannot be deleted or modified
+    /** {@code true} = system default (Salary, Food, Rent, etc.) — protected from user deletion. */
     @Builder.Default
     private Boolean isDefault = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name="profile_id",nullable=false)
+    @JoinColumn(name = "profile_id", nullable = false)
     private ProfileEntity profile;
 }

@@ -16,6 +16,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Integration test for the registration endpoint against an H2 in-memory database.
+ * {@link EmailService} is mocked to prevent real SMTP calls during test execution.
+ * Security filters are disabled ({@code addFilters = false}) so registration can be
+ * tested without a valid session or JWT.
+ */
 @Transactional
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
@@ -28,13 +34,11 @@ class AuthIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    // Prevents real email sending
     @MockitoBean
     private EmailService emailService;
 
     @Test
     void shouldRegisterUser() throws Exception {
-
         ProfileDto profile = ProfileDto.builder()
                 .fullName("Test User")
                 .email("test@mail.com")

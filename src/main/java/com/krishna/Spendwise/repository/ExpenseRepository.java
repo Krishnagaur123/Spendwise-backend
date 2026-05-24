@@ -16,27 +16,18 @@ import java.util.Optional;
 public interface ExpenseRepository extends JpaRepository<ExpenseEntity, Long> {
 
     List<ExpenseEntity> findByProfileIdOrderByDateDesc(Long profileId);
-
     List<ExpenseEntity> findTop5ByProfileIdOrderByDateDesc(Long profileId);
+    List<ExpenseEntity> findByProfileIdAndDateBetween(Long profileId, LocalDate startDate, LocalDate endDate);
+    List<ExpenseEntity> findByProfileIdAndDate(Long profileId, LocalDate date);
+    Optional<ExpenseEntity> findByIdAndProfileId(Long id, Long profileId);
+
+    List<ExpenseEntity> findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(
+            Long profileId, LocalDate startDate, LocalDate endDate, String keyword, Sort sort);
 
     @Query("SELECT SUM(e.amount) FROM ExpenseEntity e WHERE e.profile.id = :profileId")
     BigDecimal findTotalExpenseByProfileId(@Param("profileId") Long profileId);
 
-    List<ExpenseEntity> findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(
-            Long profileId,
-            LocalDate startDate,
-            LocalDate endDate,
-            String keyword,
-            Sort sort
-    );
-
-    List<ExpenseEntity> findByProfileIdAndDateBetween(Long profileId, LocalDate startDate, LocalDate endDate);
-
-    List<ExpenseEntity> findByProfileIdAndDate(Long profileId, LocalDate date);
-
-    Optional<ExpenseEntity> findByIdAndProfileId(Long id, Long profileId);
-
-    // For reports: sum expense grouped by category name within a date range
+    /** Used by {@link com.krishna.Spendwise.service.ReportService} for category-grouped reports. */
     @Query("SELECT e.category.name, SUM(e.amount) FROM ExpenseEntity e " +
            "WHERE e.profile.id = :profileId AND e.date BETWEEN :startDate AND :endDate " +
            "GROUP BY e.category.name")
@@ -45,7 +36,7 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, Long> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
-    // For goals: total expense since a given start date
+    /** Used by {@link com.krishna.Spendwise.service.GoalService} for savings progress calculation. */
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM ExpenseEntity e " +
            "WHERE e.profile.id = :profileId AND e.date >= :startDate")
     BigDecimal sumExpenseFromDate(@Param("profileId") Long profileId, @Param("startDate") LocalDate startDate);

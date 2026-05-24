@@ -1,4 +1,5 @@
 package com.krishna.Spendwise.service;
+
 import com.krishna.Spendwise.domain.entity.ProfileEntity;
 import com.krishna.Spendwise.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 
+/**
+ * Bridges Spring Security's authentication with the user database.
+ * Email address is used as the username. No roles are assigned — single-level access only.
+ */
 @Service
 @RequiredArgsConstructor
 public class AppUserDetailsService implements UserDetailsService {
@@ -27,6 +32,5 @@ public class AppUserDetailsService implements UserDetailsService {
                 .authorities(Collections.emptyList())
                 .build();
     }
-
 
 }

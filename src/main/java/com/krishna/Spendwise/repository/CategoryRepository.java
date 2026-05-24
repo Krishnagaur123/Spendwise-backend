@@ -10,21 +10,21 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface CategoryRepository extends JpaRepository<CategoryEntity,Long> {
+public interface CategoryRepository extends JpaRepository<CategoryEntity, Long> {
 
-    List<CategoryEntity> findByProfileId(Long ProfileId);
-
-    Optional<CategoryEntity> findByIdAndProfileId(Long Id, Long ProfileId);
-
-    List<CategoryEntity> findByTypeAndProfileId(String type, Long ProfileId);
-
-    Boolean existsByNameAndProfileId(String Name, Long ProfileId);
-
+    List<CategoryEntity> findByProfileId(Long profileId);
+    Optional<CategoryEntity> findByIdAndProfileId(Long id, Long profileId);
+    List<CategoryEntity> findByTypeAndProfileId(String type, Long profileId);
+    Boolean existsByNameAndProfileId(String name, Long profileId);
     Optional<CategoryEntity> findByNameAndProfileId(String name, Long profileId);
 
+    /** Returns all system-default categories (shared across users). */
     List<CategoryEntity> findByIsDefaultTrue();
 
-    // Check if category is referenced by any income or expense
+    /** Looks up a single default category by name — used when resolving transaction categories. */
+    Optional<CategoryEntity> findByIsDefaultTrueAndName(String name);
+
+    /** Used to prevent deletion of categories that are still referenced by transactions. */
     @Query("SELECT COUNT(i) FROM IncomeEntity i WHERE i.category.id = :categoryId")
     long countIncomesByCategory(@Param("categoryId") Long categoryId);
 

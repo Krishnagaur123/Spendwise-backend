@@ -15,6 +15,13 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Centralises exception-to-HTTP-response mapping for the entire application.
+ *
+ * <p>All handlers return a consistent {@code { "message": "..." }} JSON body.
+ * Security-sensitive handlers (bad credentials, username not found) return 401 with
+ * vague messages to prevent user enumeration. The generic fallback returns 500.
+ */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -38,39 +45,39 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", ex.getMessage()));
     }
 
+    /** Vague response intentional — avoids leaking whether the email exists. */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid credentials"));
     }
 
-    // Spring Security authentication failure → 401
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, String>> handleAuthenticationException(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("message", "Authentication required: " + ex.getMessage()));
     }
 
-    // Forbidden / access denied → 403
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Access denied"));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
     }
 
-    // User not found during auth → 401 (not 404, to avoid user enumeration)
+    /** Returns 401, not 404, to prevent user enumeration via email probing. */
     @ExceptionHandler(UsernameNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleUsernameNotFound(UsernameNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Authentication required"));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Authentication required"));
     }
 
-    // No matching route → 404
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<Map<String, String>> handleNoHandlerFound(NoHandlerFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("message", "Endpoint not found: " + ex.getRequestURL()));
     }
 
+    /**
+     * Returns field-level validation errors from {@code @Valid} annotated request bodies.
+     * Response shape: {@code { "message": "Validation failed", "errors": { "field": "reason" } }}
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -83,11 +90,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleHttpMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", ex.getMessage()));
+    }
+
+    /** Fallback for any unhandled exception — returns 500, never 400. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
-        // True fallback for unexpected errors.
-        // Returns 500 (Internal Server Error) - NOT 400 Bad Request.
-        // Specific known exception types are handled above with appropriate status codes.
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("message", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred"));
     }

@@ -1,10 +1,7 @@
 package com.krishna.Spendwise.domain.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -12,18 +9,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-
-
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
+/** A single income record. {@code date} defaults to today if not supplied. */
+@Data @AllArgsConstructor @NoArgsConstructor @Builder
 @Entity
-@Table(name="tbl_incomes")
+@Table(name = "tbl_incomes")
 public class IncomeEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private String name;
     private String icon;
     private LocalDate date;
@@ -46,8 +41,6 @@ public class IncomeEntity {
 
     @PrePersist
     public void prePersist() {
-        if(this.date == null) {
-            this.date = LocalDate.now();
-        }
+        if (this.date == null) this.date = LocalDate.now();
     }
 }

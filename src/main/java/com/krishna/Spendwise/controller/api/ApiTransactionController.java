@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/transactions")
+@RequestMapping("/transactions")
 @RequiredArgsConstructor
 public class ApiTransactionController {
 
@@ -31,8 +31,8 @@ public class ApiTransactionController {
     public ResponseEntity<Map<String, List<TransactionResponse>>> getTransactions(
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate,
-            @RequestParam(required = false) Long categoryId) {
-        List<TransactionResponse> transactions = transactionService.getTransactions(startDate, endDate, categoryId);
+            @RequestParam(required = false) String category) {
+        List<TransactionResponse> transactions = transactionService.getTransactions(startDate, endDate, category);
         return ResponseEntity.ok(Map.of("transactions", transactions));
     }
 

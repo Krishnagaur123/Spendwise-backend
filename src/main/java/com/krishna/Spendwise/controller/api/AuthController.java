@@ -24,6 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * Primary authentication endpoint for the assignment API ({@code /auth/*}).
+ *
+ * <p>{@code POST /auth/login} establishes both a server-side session and returns a JWT,
+ * so the React frontend (localStorage/Bearer) and assignment test clients (session cookie)
+ * can both authenticate via a single login call without modification.
+ */
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -33,6 +40,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
+    /** Registers a new user. Account is immediately active — no email verification required. */
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
         Long userId = profileService.registerWithoutActivation(request);
@@ -43,13 +51,9 @@ public class AuthController {
     }
 
     /**
-     * POST /api/v1.0/auth/login
-     *
-     * Authenticates the user via username/password, establishes a server-side session
-     * AND returns a JWT token so the frontend can choose either auth method.
-     *
-     * Response shape: { token: string, user: ProfileDto }
-     * This matches what Login.jsx expects (token stored in localStorage).
+     * Authenticates the user and returns {@code { token, user }}.
+     * Also creates a server-side session (JSESSIONID) so subsequent requests can use
+     * either the Bearer token or the session cookie interchangeably.
      */
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request,
@@ -58,28 +62,22 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
 
-        // 1. Establish session-based authentication
+        // Persist auth in both SecurityContext and HTTP session for dual-auth support
         SecurityContext sc = SecurityContextHolder.getContext();
         sc.setAuthentication(authentication);
         HttpSession session = httpRequest.getSession(true);
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, sc);
 
-        // 2. Also generate a JWT so the frontend's localStorage-based auth flow works
         String token = jwtUtil.generateToken(authentication.getName());
         Object user = profileService.getPublicProfile(authentication.getName());
 
-        return ResponseEntity.ok(Map.of(
-                "token", token,
-                "user", user
-        ));
+        return ResponseEntity.ok(Map.of("token", token, "user", user));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<MessageResponse> logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
+        if (session != null) session.invalidate();
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok(new MessageResponse("Logout successful"));
     }
