@@ -32,9 +32,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception{
-        // Use HttpSessionSecurityContextRepository so Spring Security can
-        // restore authentication from the JSESSIONID cookie on every request.
-        // Without this, session login works once but subsequent requests lose auth.
+
         HttpSessionSecurityContextRepository sessionRepo = new HttpSessionSecurityContextRepository();
 
         httpSecurity.cors(Customizer.withDefaults())
@@ -58,8 +56,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Cookie"));
-        // Expose Set-Cookie so the browser can store the JSESSIONID session cookie
-        // in cross-origin requests (frontend :3000 <-> backend :8080).
+
         configuration.setExposedHeaders(List.of("Set-Cookie"));
         configuration.setAllowCredentials(true);
 
